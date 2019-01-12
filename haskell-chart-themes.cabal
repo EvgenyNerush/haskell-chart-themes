@@ -1,0 +1,23 @@
+name:                haskell-chart-themes
+version:             0.1.0
+synopsis:            Themes for haskell-chart library to produce publication-ready figures
+homepage:            https://github.com/EvgenyNerush/haskell-chart-themes
+license:             BSD3
+license-file:        LICENSE
+author:              Evgeny Nerush
+maintainer:          eugene.nerush@gmail.com
+build-type:          Simple
+extra-source-files:  CHANGELOG.md
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Graphics.Rendering.Chart.Themes
+                     , Graphics.Rendering.Chart.Themes.Plasma
+  build-depends:       base >=4.9 && <4.13
+                     , Chart
+                     , Chart-cairo
+                     , colour >= 2.2.1
+                     , lens >= 3.9
+                     , data-default-class
+  hs-source-dirs:      src
+  default-language:    Haskell2010

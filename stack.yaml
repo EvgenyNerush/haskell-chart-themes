@@ -1,0 +1,11 @@
+resolver: lts-9.21
+
+packages:
+- .
+
+extra-deps:
+- git: https://github.com/timbod7/haskell-chart
+  commit: 4af229f628011801ebbbb88c4fd3d356e95c8e43
+  subdirs:
+  - chart/
+  - chart-cairo/
