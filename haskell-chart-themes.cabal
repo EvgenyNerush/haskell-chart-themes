@@ -1,5 +1,5 @@
 name:                haskell-chart-themes
-version:             0.1.0
+version:             0.2.0
 synopsis:            Themes for haskell-chart library to produce publication-ready figures
 homepage:            https://github.com/EvgenyNerush/haskell-chart-themes
 license:             BSD3
