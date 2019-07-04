@@ -13,6 +13,10 @@ import Graphics.Rendering.Chart.Axis.Floating
 import Graphics.Rendering.Chart.Backend.Cairo
 import Graphics.Rendering.Chart.Plot.Annotation
 import Graphics.Rendering.Chart.Plot.Lines
+import Graphics.Rendering.Chart.Plot.FillBetween
+import Graphics.Rendering.Chart.Plot.Points
+import Graphics.Rendering.Chart.Plot.Types
+import Graphics.Rendering.Chart.Drawing
 
 import Graphics.Rendering.Chart.Themes
 
@@ -40,6 +44,10 @@ plasticFigBox' = mSnd 2 plasticFigBox
 -- goldenFigBox with twice enlarged height
 goldenFigBox' :: Pair Int
 goldenFigBox' = mSnd 2 goldenFigBox
+
+-- box with width-to-height ratio of 1 : 0.5
+halfFigBox :: Pair Int
+halfFigBox = fmap cmToPt $ Pair columnWidth $ columnWidth / 2
 
 fileOptions :: Pair Int -> FileOptions
 fileOptions (Pair x y) = FileOptions (x, y) PDF
@@ -75,10 +83,20 @@ axisLineStyle = line_width .~ thinLineWidth
               $ line_color .~ opaque gray
               $ D.def
 
+plotLineStyle :: LineStyle
+plotLineStyle = line_color .~ opaque black
+              $ line_width .~ normalLineWidth
+              $ D.def
+
 axisGridStyle = line_color .~ opaque lightgray
-              $ line_dashes .~ [d, 3 * d]
+              $ line_dashes .~ [2 * thinLineWidth, 6 * thinLineWidth]
               $ axisLineStyle
-  where d = thinLineWidth * 2
+
+dashedLineStyle = line_dashes .~ [6 * thinLineWidth, 2 * thinLineWidth]
+                $ plotLineStyle
+
+dottedLineStyle = line_dashes .~ [thinLineWidth, thinLineWidth]
+                $ plotLineStyle
 
 axisStyle :: AxisStyle
 axisStyle = axis_line_style .~ axisLineStyle
@@ -98,10 +116,10 @@ majorTickLength = -minorTickLength
 
 
 -- | this function sets length of major and minor ticks
-autoAxis' :: PlotValue x => [x] -> AxisData x
-autoAxis' xs = axis_ticks .~ majors ++ minors
+setTickLength :: PlotValue x => ([x] -> AxisData x) -> [x] -> AxisData x
+setTickLength axis_fn xs = axis_ticks .~ majors ++ minors
              $ axis
-  where axis = autoAxis xs
+  where axis = axis_fn xs
         ticks = _axis_ticks axis
         meanL = (foldl (\x (_, y) -> x + y) 0 ticks) / (fromIntegral $ length ticks)
         minors = map (\(x, y) -> (x, minorTickLength))
@@ -109,26 +127,35 @@ autoAxis' xs = axis_ticks .~ majors ++ minors
         majors = map (\(x, y) -> (x, majorTickLength))
           $ filter (\(_, y) -> y >= meanL) ticks
 
-{--
-majorTickHeight = fontSize / (goldenRatio**2)
+autoAxis' :: PlotValue x => [x] -> AxisData x
+autoAxis' = setTickLength autoAxis
 
-axisGenerate :: (PlotValue x, RealFloat x, Show x) => [x] -> AxisFn x
-axisGenerate labelpos _ = axis_ticks .~ (map (\(x, h) -> (x, majorTickHeight)) $ _axis_ticks ma)
-                        $ ma
-  where ma = makeAxis (_la_labelf d) (labelpos, tickpos, gridpos)
-        tickpos = tail labelpos
-        gridpos = tail labelpos
-        d :: (RealFloat a, Show a) => LinearAxisParams a
-        d = D.def
+-- splits the given interval by the given number of parts
+split :: RealFloat x => (x, x) -> Int -> [x]
+split (minV, maxV) n = [minV + dx * fromIntegral i | i <- [0..n]]
+  where dx = (maxV - minV) / fromIntegral n
 
-defPlotAnnotation :: PlotAnnotation x y
-defPlotAnnotation = plot_annotation_style .~ titleFontStyle
-                  $ D.def
-                  --}
+simpleScaledAxis :: (RealFloat x, Show x, PlotValue x) => [x] -> [x] -> [x] -> AxisData x
+simpleScaledAxis majorTickP minorTickP _ = makeAxis' realToFrac realToFrac
+                                            labelf (labelvs, tickvs, gridvs)
+  where labelf = (map cleanup) . (_la_labelf D.def)
+        labelvs = majorTickP -- position of labels and major ticks
+        tickvs  = minorTickP -- position of minor ticks
+        gridvs  = majorTickP -- position of grid lines
+        -- drops long tails, e.g. converts "0.15000000000000002" to "0.15"
+        cleanup cs = lhs ++ go [] rhs
+          where (lhs, rhs) = span (/= '.') cs
+                go acc [] = reverse acc
+                go acc rs@(c:cs)
+                  | length (takeWhile (== '0') rs) >= 6 = go acc []
+                  | otherwise                           = go (c:acc) cs
+
+scaledAxis' :: (RealFloat x, Show x, PlotValue x) => [x] -> [x] -> [x] -> AxisData x
+scaledAxis' majorTickP minorTickP = setTickLength (simpleScaledAxis majorTickP minorTickP)
 
 defLayout :: (PlotValue x, PlotValue y) => Layout x y
 defLayout = layout_title_style .~ titleFontStyle
-          $ layout_margin .~ 0
+          $ layout_margin .~ 2
           $ layout_x_axis . laxis_title_style .~ axisTitleFontStyle
           $ layout_x_axis . laxis_style .~ axisXStyle
           $ layout_x_axis . laxis_generate .~ autoAxis'
@@ -144,4 +171,17 @@ instance Default FileOptions where
   def = fileOptions goldenFigBox
 
 instance Default (PlotLines x y) where
-  def = plot_lines_style .~ (line_color .~ opaque black $ axisLineStyle) $ D.def
+  def = plot_lines_style .~ plotLineStyle $ D.def
+
+instance Default (PlotFillBetween x y) where
+  def = plot_fillbetween_style .~ (FillStyleSolid $ opaque lightgray) $ D.def
+
+instance Default (PlotPoints x y) where
+  def = plot_points_style .~ filledPolygon 2.7 3 False (opaque gray) $ D.def
+
+instance Default (PlotAnnotation x y) where
+  def = plot_annotation_style .~ axisTitleFontStyle
+      $ D.def
+
+instance (Show a, RealFloat a) => Default (LinearAxisParams a) where
+  def = D.def
