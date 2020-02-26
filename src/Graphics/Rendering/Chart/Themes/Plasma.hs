@@ -153,6 +153,15 @@ simpleScaledAxis majorTickP minorTickP _ = makeAxis' realToFrac realToFrac
 scaledAxis' :: (RealFloat x, Show x, PlotValue x) => [x] -> [x] -> [x] -> AxisData x
 scaledAxis' majorTickP minorTickP = setTickLength (simpleScaledAxis majorTickP minorTickP)
 
+scaledAxisWithLabeledTicks :: (RealFloat x, PlotValue x)
+    => [x] -> [x] -> [String] -> [x] -> AxisData x
+scaledAxisWithLabeledTicks majorTickP minorTickP majorTickLabels
+  = setTickLength (\_ -> makeAxis' realToFrac realToFrac labelf (labelvs, tickvs, gridvs))
+    where labelf _ = majorTickLabels
+          labelvs = majorTickP -- position of labels and major ticks
+          tickvs  = minorTickP -- position of minor ticks
+          gridvs  = majorTickP -- position of grid lines
+
 defLayout :: (PlotValue x, PlotValue y) => Layout x y
 defLayout = layout_title_style .~ titleFontStyle
           $ layout_margin .~ 2
@@ -177,7 +186,10 @@ instance Default (PlotFillBetween x y) where
   def = plot_fillbetween_style .~ (FillStyleSolid $ opaque lightgray) $ D.def
 
 instance Default (PlotPoints x y) where
-  def = plot_points_style .~ filledPolygon 2.7 3 False (opaque gray) $ D.def
+  def = plot_points_style . point_border_width .~ normalLineWidth
+      $ plot_points_style . point_border_color .~ (opaque gray)
+      $ plot_points_style .~ filledPolygon 2 3 False (opaque gray)
+      $ D.def
 
 instance Default (PlotAnnotation x y) where
   def = plot_annotation_style .~ axisTitleFontStyle
