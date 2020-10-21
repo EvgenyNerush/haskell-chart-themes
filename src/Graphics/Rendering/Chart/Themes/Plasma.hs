@@ -138,17 +138,41 @@ split (minV, maxV) n = [minV + dx * fromIntegral i | i <- [0..n]]
 simpleScaledAxis :: (RealFloat x, Show x, PlotValue x) => [x] -> [x] -> [x] -> AxisData x
 simpleScaledAxis majorTickP minorTickP _ = makeAxis' realToFrac realToFrac
                                             labelf (labelvs, tickvs, gridvs)
-  where labelf = (map cleanup) . (_la_labelf D.def)
+  where labelf = (map (cleanup0s . cleanup9s)) . (_la_labelf D.def)
         labelvs = majorTickP -- position of labels and major ticks
         tickvs  = minorTickP -- position of minor ticks
         gridvs  = majorTickP -- position of grid lines
-        -- drops long tails, e.g. converts "0.15000000000000002" to "0.15"
-        cleanup cs = lhs ++ go [] rhs
+        -- drops long tails with zeroes, e.g. converts "0.15000000000000002" to "0.15"
+        cleanup0s cs = lhs ++ go [] rhs
           where (lhs, rhs) = span (/= '.') cs
                 go acc [] = reverse acc
                 go acc rs@(c:cs)
                   | length (takeWhile (== '0') rs) >= 6 = go acc []
                   | otherwise                           = go (c:acc) cs
+        -- drops long tails with nines, e.g. converts "0.39999999999999997" to "0.4"
+        cleanup9s cs = if startsWithNines rhs then (reverse . plusOne . reverse) lhs
+                       else lhs ++ ['.'] ++ go [] rhs
+          where (lhs, rhsD) = span (/= '.') cs -- e.g. "3", ".14159"
+                rhs = let f [] = []
+                          f (x:xs) = xs
+                      in f rhsD -- then just "14159"
+                startsWithNines xs = length (takeWhile (== '9') xs) >= 6
+                plusOne [] = "1"
+                plusOne (x:xs)
+                  | x == '9' = '0':(plusOne xs)
+                  | x == '8' = '9':xs
+                  | x == '7' = '8':xs
+                  | x == '6' = '7':xs
+                  | x == '5' = '6':xs
+                  | x == '4' = '5':xs
+                  | x == '3' = '4':xs
+                  | x == '2' = '3':xs
+                  | x == '1' = '2':xs
+                  | x == '0' = '1':xs
+                go acc [] = reverse acc
+                go acc rs@(c:cs)
+                  | startsWithNines rs = (reverse . plusOne) acc
+                  | otherwise          = go (c:acc) cs
 
 scaledAxis' :: (RealFloat x, Show x, PlotValue x) => [x] -> [x] -> [x] -> AxisData x
 scaledAxis' majorTickP minorTickP = setTickLength (simpleScaledAxis majorTickP minorTickP)
